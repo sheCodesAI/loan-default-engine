@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+ENV/
+env/
+.env
+.DS_Store
+=2.0
+ai/artifacts/eda_plots/
+ai/artifacts/logs/
+sl.log
+streamlit.log

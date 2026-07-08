@@ -1,0 +1,34 @@
+# IDBI AI Credit Risk Intelligence Platform — Requirements
+# Python >= 3.10 required
+#
+# Install all dependencies:
+#   pip install -r requirements.txt
+
+# ── Core Data Science ─────────────────────────────────────────────────────────
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# ── Machine Learning ──────────────────────────────────────────────────────────
+xgboost>=2.0.0
+
+# ── Explainability ────────────────────────────────────────────────────────────
+shap>=0.44.0
+
+# ── Visualisation ─────────────────────────────────────────────────────────────
+matplotlib>=3.7.0
+plotly>=5.17.0          # Reserved for future interactive plots / dashboard
+
+# ── Schema Validation ─────────────────────────────────────────────────────────
+pydantic>=2.0.0
+
+# ── Model Persistence ─────────────────────────────────────────────────────────
+joblib>=1.3.0
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest>=7.4.0
+pytest-cov>=4.1.0       # Coverage reporting: pytest --cov=ai
+
+# ── Future: API Layer (not yet active) ───────────────────────────────────────
+# fastapi>=0.104.0
+# uvicorn>=0.24.0
