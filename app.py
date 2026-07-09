@@ -488,6 +488,9 @@ with tab6:
     if uploaded_file is not None:
         try:
             df_batch = pd.read_csv(uploaded_file)
+            # Standardize column names to lowercase with underscores for robust matching
+            df_batch.columns = df_batch.columns.str.lower().str.strip().str.replace(' ', '_')
+            
             st.markdown(f"**Dataset Preview ({len(df_batch)} rows):**")
             st.dataframe(df_batch.head())
             
