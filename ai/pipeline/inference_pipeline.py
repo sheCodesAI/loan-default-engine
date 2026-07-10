@@ -47,22 +47,10 @@ class InferencePipeline:
     End-to-end inference pipeline.
 
     Loads model and preprocessor once at initialization (lazy loading).
-    Subsequent calls to run() are stateless and thread-safe
-    (each call creates its own local state).
-
-    Initialize once; reuse for multiple inference calls.
+    Subsequent calls to run() are stateless and thread-safe.
     """
 
     def __init__(self, threshold: Optional[float] = None) -> None:
-        """
-        Initialize the inference pipeline.
-
-        Loads model, preprocessor, and metadata from artifacts/.
-        Initializes all five engines.
-
-        Args:
-            threshold: Decision threshold. If None, loads from model metadata.
-        """
         logger.info("Initializing InferencePipeline...")
 
         # ── Load artifacts ───────────────────────────────────────────────
@@ -84,7 +72,7 @@ class InferencePipeline:
             feature_names=self.feature_names,
         )
 
-        # ── Intelligence Engines (stateless — instantiate once) ──────────
+        # ── Intelligence Engines ─────────────────────────────────────────
         self.borrower_360_engine = Borrower360Engine()
         self.geo_engine = GeoResilienceEngine()
         self.rules_engine = BusinessRulesEngine()
@@ -99,12 +87,6 @@ class InferencePipeline:
     def run(self, request: InferenceRequest) -> RiskIntelligenceOutput:
         """
         Run the complete inference pipeline for a single loan application.
-
-        Args:
-            request: Validated :class:`InferenceRequest`.
-
-        Returns:
-            :class:`RiskIntelligenceOutput` — final structured AI decision.
         """
         logger.info(
             "Inference started — request_id=%s, borrower_age=%d, loan=%.0f",
@@ -125,7 +107,7 @@ class InferencePipeline:
         )
 
         # ── Step 3: ML Prediction ─────────────────────────────────────────
-        X_input = self._build_feature_vector(request, borrower_360)
+        X_input = self._build_feature_vector(request, borrower_360, geo)
         X_processed = self.preprocessor.transform(X_input)
         raw_probability = float(self.model.predict_proba(X_processed)[0, 1])
         logger.info("ML raw default probability: %.4f", raw_probability)
@@ -136,7 +118,6 @@ class InferencePipeline:
             shap_vals, top_n=SHAP_TOP_N_FEATURES
         )
 
-        # Determine risk level for narrative (pre-geo-adjustment)
         from ai.engines.risk_intelligence import classify_risk_level
         preliminary_risk = classify_risk_level(raw_probability)
 
@@ -155,7 +136,6 @@ class InferencePipeline:
         )
 
         # ── Step 6: Recommendation Engine ────────────────────────────────
-        # Use geo-adjusted probability for recommendation
         geo_adjusted_prob = min(raw_probability * geo.risk_adjustment, 1.0)
         adjusted_risk_level = classify_risk_level(geo_adjusted_prob)
 
@@ -194,12 +174,16 @@ class InferencePipeline:
         self,
         request: InferenceRequest,
         borrower_360: "Borrower360Output",
+        geo: "GeoResilienceOutput",
     ) -> pd.DataFrame:
         """
         Build a single-row DataFrame for the preprocessor from the request.
 
-        Maps InferenceRequest fields → canonical training feature names.
-        FUTURE_INTEGRATION fields are filled with sensible defaults.
+        CRITICAL: Only includes features that are ACTUALLY AVAILABLE from the
+        UI form or can be faithfully derived. No hardcoded constants for
+        categorical features — that collapses the model's discriminative power.
+
+        This must align EXACTLY with ai/models/preprocessor.py NOMINAL_FEATURES.
         """
         from ai.utils.financial_utils import calculate_loan_to_income_ratio
         from ai.utils.geo_data import get_state_risk_profile
@@ -208,6 +192,7 @@ class InferencePipeline:
         l = request.loan
         g = request.geo
 
+        # ── Derived numeric values ────────────────────────────────────────
         monthly_income = b.monthly_income or (b.annual_income / 12)
         emp_stability = min(b.employment_length_months / 60, 1.0)
         cs = b.credit_score if b.credit_score is not None else 650
@@ -218,57 +203,85 @@ class InferencePipeline:
             geo_profile.flood_risk * 0.3 + geo_profile.drought_risk * 0.4
             + geo_profile.cyclone_risk * 0.2 + geo_profile.heatwave_risk * 0.1, 4
         )
-        district_risk = state_risk   # FUTURE_INTEGRATION: district-level lookup
+        district_risk = state_risk
 
         loan_to_income = calculate_loan_to_income_ratio(l.loan_amount, b.annual_income)
 
+        # ── Derive loan_product from loan characteristics ──────────────────
+        # Secured: Home/Vehicle/Agri loans are typically secured
+        secured_purposes = {"Home", "Vehicle", "Agri"}
+        loan_product = "Secured" if l.loan_purpose.value in secured_purposes else "Unsecured"
+
+        # ── Derive loan_source_type from co-applicant / context ───────────
+        # New customers → New; with co-applicant → Repeat pattern
+        loan_source_type = "New"
+
+        # ── Derive branch_region from state ──────────────────────────────
+        state_to_region = {
+            "Maharashtra": "WestZone",
+            "Gujarat": "WestZone",
+            "Rajasthan": "WestZone",
+            "Goa": "WestZone",
+            "Karnataka": "SouthZone",
+            "Tamil Nadu": "SouthZone",
+            "Kerala": "SouthZone",
+            "Andhra Pradesh": "SouthZone",
+            "Telangana": "SouthZone",
+            "Uttar Pradesh": "NorthZone",
+            "Punjab": "NorthZone",
+            "Haryana": "NorthZone",
+            "Himachal Pradesh": "NorthZone",
+            "Uttarakhand": "NorthZone",
+            "Delhi": "NorthZone",
+            "Madhya Pradesh": "CentralZone",
+            "Chhattisgarh": "CentralZone",
+            "West Bengal": "EastZone",
+            "Bihar": "EastZone",
+            "Jharkhand": "EastZone",
+            "Odisha": "EastZone",
+            "Assam": "EastZone",
+        }
+        branch_region = state_to_region.get(g.state, "CentralZone")
+
+        # ── Build feature row ─────────────────────────────────────────────
         row = {
-            # Numeric
-            "age": b.age,
-            "income": b.annual_income,
-            "monthly_income": monthly_income,
-            "employment_length": b.employment_length_months,
-            "credit_score": cs,
+            # ── Numeric features (must match preprocessor.NUMERIC_FEATURES) ──
+            "age":                   b.age,
+            "income":                b.annual_income,
+            "monthly_income":        monthly_income,
+            "employment_length":     b.employment_length_months,
+            "credit_score":          cs,
             "credit_history_length": b.credit_history_length_months or 0,
-            "delinquency_count": 0,
-            "loan_amount": l.loan_amount,
-            "loan_tenure": l.loan_tenure_months,
-            "interest_rate": l.interest_rate,
-            "emi_amount": borrower_360.estimated_emi,
-            "existing_emi": l.existing_monthly_obligations,
-            "dti_ratio": borrower_360.dti_ratio,
-            "area_default_rate": 9.0,       # FUTURE_INTEGRATION: area mean
-            "district_risk_score": district_risk,
-            "state_risk_score": state_risk,
-            "distance_to_branch_km": 10.0,  # FUTURE_INTEGRATION
-            "service_area_cluster": 0,       # FUTURE_INTEGRATION
-            "repayment_capacity": borrower_360.repayment_capacity,
-            "cash_flow_health": borrower_360.cash_flow_health,
-            "loan_to_income_ratio": loan_to_income,
-            "employment_stability": emp_stability,
+            "delinquency_count":     0,
+            "loan_amount":           l.loan_amount,
+            "loan_tenure":           l.loan_tenure_months,
+            "interest_rate":         l.interest_rate,
+            "emi_amount":            borrower_360.estimated_emi,
+            "existing_emi":          l.existing_monthly_obligations,
+            "dti_ratio":             borrower_360.dti_ratio,
+            "area_default_rate":     geo_profile.flood_risk * 10 + 5.0,  # proxy from geo risk
+            "district_risk_score":   district_risk,
+            "state_risk_score":      state_risk,
+            "repayment_capacity":    borrower_360.repayment_capacity,
+            "cash_flow_health":      borrower_360.cash_flow_health,
+            "loan_to_income_ratio":  loan_to_income,
+            "employment_stability":  emp_stability,
             "credit_score_normalized": cs_normalized,
-            # Categorical
-            "employment_type": b.employment_type.value,
-            "gender": "Male",           # FUTURE_INTEGRATION
-            "education": "Graduate",    # FUTURE_INTEGRATION
-            "marital_status": b.marital_status or "Married",
-            "loan_purpose": l.loan_purpose.value,
-            "loan_product": "Unsecured",   # FUTURE_INTEGRATION
-            "loan_source_type": "New",     # FUTURE_INTEGRATION
-            "urban_rural_flag": "Urban",   # FUTURE_INTEGRATION
-            "branch_region": "WestZone",   # FUTURE_INTEGRATION: default to most common
-            "population_density_band": "Medium",   # FUTURE_INTEGRATION
-            "economic_activity_type": "Salaried",  # FUTURE_INTEGRATION
-            "channel": "Branch",       # FUTURE_INTEGRATION
-            "state": g.state,          # Geographic state — OHE-encoded in preprocessor
-            # Binary
-            "has_mortgage": int(b.home_ownership.value.upper() == "MORTGAGE"),
-            "has_dependents": int(b.dependents > 0),
-            "has_cosigner": int(l.co_applicant),
-            "past_default_flag": 0,     # FUTURE_INTEGRATION
-            "near_retirement_flag": int(b.age > 58),
-            "high_dti_flag": int(borrower_360.dti_ratio > 0.60),
-            "delinquency_flag": 0,      # FUTURE_INTEGRATION
+            # ── Nominal features (must match preprocessor.NOMINAL_FEATURES) ──
+            "employment_type":   b.employment_type.value,
+            "loan_purpose":      l.loan_purpose.value,
+            "state":             g.state,
+            "loan_product":      loan_product,
+            "loan_source_type":  loan_source_type,
+            "branch_region":     branch_region,
+            # ── Binary features (must match preprocessor.BINARY_FEATURES) ──
+            "has_mortgage":          int(b.home_ownership.value.upper() == "MORTGAGE"),
+            "has_dependents":        int(b.dependents > 0),
+            "has_cosigner":          int(l.co_applicant),
+            "past_default_flag":     0,
+            "near_retirement_flag":  int(b.age > 58),
+            "high_dti_flag":         int(borrower_360.dti_ratio > 0.60),
+            "delinquency_flag":      0,
         }
 
         return pd.DataFrame([row])

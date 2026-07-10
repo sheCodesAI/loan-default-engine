@@ -44,6 +44,8 @@ The AI **assists** human loan officers — it never replaces human judgment.
 ```
 IDBI/
 ├── demo.py                        ← Hackathon demo entry point
+├── app.py                         ← Streamlit Dashboard (Primary UI)
+├── generate_realistic_data.py     ← Script to generate statistically realistic loan data
 ├── walkthrough.md                 ← This document
 ├── PROJECT_HEALTH_REPORT.md       ← Technical assessment
 ├── requirements.txt               ← All dependencies
@@ -385,7 +387,13 @@ This will:
 - Evaluate and log metrics (AUC-ROC, Gini, KS)
 - Save `model_v1.joblib`, `preprocessor_v1.joblib`, `model_metadata.json`
 
-### Step 4: Run the demo
+### Step 4: Run the Streamlit Dashboard (Primary Demo)
+```bash
+streamlit run app.py
+```
+This will launch the comprehensive UI on `http://localhost:8501`.
+
+### Step 5: Run the CLI Demo (Optional)
 ```bash
 python demo.py
 ```
@@ -410,22 +418,25 @@ python -m ai.pipeline.train_pipeline --tune
 **1. Start with the architecture** (30 seconds)
 > "We built a modular AI system with three intelligence layers: Borrower 360°, Geo & Resilience, and ML Risk Prediction. Each layer is independent, testable, and pluggable."
 
-**2. Run the demo live**
+**2. Run the dashboard live**
 ```bash
-python demo.py
+streamlit run app.py
 ```
 Walk through each section:
-- **Borrower 360°**: "The AI has computed a borrower score of X, financial health is STRONG, and the repayment capacity is ₹28,500/month."
-- **Geo & Resilience**: "Maharashtra has a resilience score of 62. The system automatically enriches the application with climate risk data — flood, drought, and cyclone risk — without the officer needing to look it up."
-- **SHAP Explanation**: "The AI doesn't just give a number — it explains *why*. These are the top factors driving the risk score, ranked by their impact."
-- **Business Rules**: "The compliance team's rules are enforced separately from the model. This is important for regulatory auditing."
-- **What-If Simulation**: "Watch what happens when we add a co-applicant and reduce the loan amount. The expected loss drops by ₹1.2L."
+- **Interactive Form**: Fill out a borrower profile and click "Analyze Risk".
+- **Risk Assessment Summary**: Show the default probability, risk level, and expected loss.
+- **Detailed Analysis Tabs**: 
+  - **Borrower 360°**: Explain the financial health and repayment capacity.
+  - **Geo & Resilience**: Highlight the state-level climate risk integration.
+  - **SHAP Explainer**: Show the feature importance driving the decision.
+  - **What-If Simulator**: Demonstrate changing variables (e.g., adding a co-applicant) to see the immediate effect on risk.
+  - **Batch Upload**: Upload a CSV to score hundreds of applications instantly.
 
 **3. Highlight key differentiators**
 - Geo & Resilience is the USP — no other system incorporates state-level climate risk
 - SHAP explainability ensures regulatory transparency (RBI AI guidelines)
 - What-If Simulator supports pre-approval negotiation
-- Batch Dataset Evaluation UI allows running inferences on multiple applications via CSV upload
+- Streamlit UI offers both individual assessment and bulk CSV processing
 - Business Rules Engine is configurable without retraining
 
 **4. Discuss production readiness**

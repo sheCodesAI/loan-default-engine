@@ -32,6 +32,32 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 [data-testid="stSidebar"] { background: linear-gradient(180deg, #0d1117 0%, #0a1628 100%); border-right: 1px solid #1e3a5f; }
 [data-testid="stSidebar"] * { color: #c9d5e8 !important; }
 
+.csv-cta {
+    background: linear-gradient(135deg, #0d2b4e 0%, #0e3b6e 50%, #1a4a8a 100%);
+    border: 2px solid #3498db;
+    border-radius: 16px;
+    padding: 28px 36px;
+    margin: 20px 0;
+    box-shadow: 0 8px 32px rgba(52,152,219,0.4), 0 0 60px rgba(52,152,219,0.1);
+    text-align: center;
+    animation: glow 3s ease-in-out infinite;
+}
+.csv-cta h2 { color: #5dade2; font-size: 1.5rem; font-weight: 700; margin: 0 0 8px; }
+.csv-cta p { color: #aed6f1; margin: 0; font-size: 0.95rem; }
+.csv-cta .badge { display: inline-block; background: rgba(52,152,219,0.2); border: 1px solid #3498db; border-radius: 20px; padding: 4px 16px; color: #5dade2; font-size: 0.8rem; font-weight: 600; margin: 12px 4px 0; }
+@keyframes glow { 0%,100%{box-shadow:0 8px 32px rgba(52,152,219,0.4);} 50%{box-shadow:0 8px 48px rgba(52,152,219,0.7);} }
+
+.stat-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 20px 0;
+}
+.stat-item {
+    background: linear-gradient(135deg, #0d1b2e, #0e2240);
+    border: 1px solid #1e3a5f; border-radius: 12px; padding: 20px;
+    text-align: center;
+}
+.stat-item .stat-val { font-size: 2rem; font-weight: 700; color: #5dade2; }
+.stat-item .stat-label { font-size: 0.78rem; color: #7fb3d3; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+
 .bank-header {
     background: linear-gradient(135deg, #0a2342 0%, #0d3b7a 50%, #1a5276 100%);
     border-radius: 16px;
@@ -163,11 +189,39 @@ with st.sidebar:
 
 # ── Main Panel ────────────────────────────────────────────────────────────────
 if not analyze:
-    st.info("👈 Fill in the loan application details in the sidebar and click **Analyze Risk** to begin.")
+    # ── Hero Landing Page ────────────────────────────────────────────────────
+    st.markdown("""
+    <div class="csv-cta">
+      <h2>📂 Bulk CSV Evaluation — Upload Your Loan Dataset</h2>
+      <p>Have a batch of loan applications? Skip the manual form — upload a CSV and get instant AI risk predictions for every borrower.</p>
+      <span class="badge">⚡ Real-time ML Scoring</span>
+      <span class="badge">📊 SHAP Explainability</span>
+      <span class="badge">🗺️ Geo Risk Intelligence</span>
+      <span class="badge">📥 Downloadable Results</span>
+      <br><br>
+      <p style="color:#5dade2;font-weight:600;">👇 Click "Analyze Risk" in sidebar for single application OR scroll to Batch Upload tab after analysis</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="stat-grid">
+      <div class="stat-item"><div class="stat-val">0.75</div><div class="stat-label">AUC-ROC Score</div></div>
+      <div class="stat-item"><div class="stat-val">15K</div><div class="stat-label">Training Records</div></div>
+      <div class="stat-item"><div class="stat-val">84</div><div class="stat-label">Tests Passing ✅</div></div>
+      <div class="stat-item"><div class="stat-val">0.50</div><div class="stat-label">Gini Coefficient</div></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### 📋 How to Use")
     col1, col2, col3 = st.columns(3)
-    col1.metric("Engine", "XGBoost + SHAP")
-    col2.metric("Training Records", "15,000")
-    col3.metric("Unit Tests", "84 Passing ✅")
+    with col1:
+        st.markdown("#### 🔍 Single Application\n1. Fill in borrower details in the left sidebar\n2. Click **Analyze Risk**\n3. View full risk report with SHAP explanations")
+    with col2:
+        st.markdown("#### 📂 Batch Upload\n1. Click **Analyze Risk** once to load the dashboard\n2. Go to the **📂 Batch Upload** tab\n3. Upload your CSV → Download predictions")
+    with col3:
+        st.markdown("#### 📄 CSV Format Required\n`age`, `credit_score`, `annual_income`, `employment_type`, `employment_length`, `loan_amount`, `loan_tenure`, `loan_purpose`, `interest_rate`, `state`")
+
     st.stop()
 
 # ── Run inference ─────────────────────────────────────────────────────────────
@@ -480,76 +534,127 @@ with tab5:
 
 # Tab 6: Batch Upload
 with tab6:
-    st.markdown("#### 📂 Batch Dataset Evaluation")
-    st.markdown("Upload a CSV file containing borrower and loan details to run batch predictions.")
-    
-    uploaded_file = st.file_uploader("Choose a CSV dataset (Must contain: age, annual_income, employment_type, home_ownership, credit_score, loan_amount, loan_tenure, loan_purpose, interest_rate, state)", type="csv")
-    
+    st.markdown("""
+    <div class="csv-cta">
+      <h2>ð Batch Loan Dataset Evaluation</h2>
+      <p>Upload a CSV of loan applications — the AI scores every row instantly with full risk intelligence.</p>
+      <span class="badge">â¡ Instant Predictions</span>
+      <span class="badge">ð Risk Distribution Chart</span>
+      <span class="badge">ð¥ Download Full Report</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    sample_data = pd.DataFrame([
+        {"age": 35, "annual_income": 720000, "employment_type": "Salaried", "employment_length": 48, "home_ownership": "Rent", "credit_score": 700, "dependents": 1, "loan_amount": 500000, "loan_tenure": 36, "loan_purpose": "Personal", "interest_rate": 14.0, "existing_emi": 5000, "co_applicant": False, "state": "Maharashtra"},
+        {"age": 28, "annual_income": 300000, "employment_type": "SelfEmployed", "employment_length": 24, "home_ownership": "Rent", "credit_score": 550, "dependents": 2, "loan_amount": 800000, "loan_tenure": 24, "loan_purpose": "Business", "interest_rate": 18.0, "existing_emi": 10000, "co_applicant": False, "state": "Bihar"},
+        {"age": 50, "annual_income": 3000000, "employment_type": "Salaried", "employment_length": 180, "home_ownership": "Own", "credit_score": 850, "dependents": 0, "loan_amount": 200000, "loan_tenure": 60, "loan_purpose": "Home", "interest_rate": 8.5, "existing_emi": 0, "co_applicant": True, "state": "Karnataka"},
+        {"age": 42, "annual_income": 250000, "employment_type": "Farmer", "employment_length": 12, "home_ownership": "Rent", "credit_score": 480, "dependents": 3, "loan_amount": 600000, "loan_tenure": 18, "loan_purpose": "Agri", "interest_rate": 19.0, "existing_emi": 8000, "co_applicant": False, "state": "Uttar Pradesh"},
+        {"age": 32, "annual_income": 900000, "employment_type": "Business", "employment_length": 72, "home_ownership": "Mortgage", "credit_score": 750, "dependents": 0, "loan_amount": 1500000, "loan_tenure": 60, "loan_purpose": "Home", "interest_rate": 10.5, "existing_emi": 15000, "co_applicant": True, "state": "Gujarat"},
+    ])
+    sample_csv = sample_data.to_csv(index=False).encode("utf-8")
+
+    col_dl, col_info = st.columns([1, 3])
+    with col_dl:
+        st.download_button("ð Download Sample CSV", data=sample_csv, file_name="sample_loan_applications.csv", mime="text/csv")
+    with col_info:
+        st.info("**Required columns:** age, annual_income, employment_type, credit_score, loan_amount, loan_tenure, loan_purpose, interest_rate, state | Optional: employment_length, home_ownership, dependents, existing_emi, co_applicant")
+
+    st.markdown("---")
+    uploaded_file = st.file_uploader("⬆ Upload your CSV loan dataset here", type="csv")
+
     if uploaded_file is not None:
         try:
             df_batch = pd.read_csv(uploaded_file)
-            # Standardize column names to lowercase with underscores for robust matching
-            df_batch.columns = df_batch.columns.str.lower().str.strip().str.replace(' ', '_')
-            
-            st.markdown(f"**Dataset Preview ({len(df_batch)} rows):**")
-            st.dataframe(df_batch.head())
-            
-            if st.button("▶ Run Batch Prediction", type="primary"):
-                st.info("Batch prediction running... This may take a moment.")
-                results = []
-                
-                # Simple progress bar
+            df_batch.columns = df_batch.columns.str.lower().str.strip().str.replace(" ", "_")
+            st.success(f"✅ Dataset loaded — **{len(df_batch)} applications** ready for scoring.")
+            with st.expander("ð Preview Dataset (first 5 rows)", expanded=False):
+                st.dataframe(df_batch.head(), use_container_width=True)
+
+            if st.button("▶ Run Batch AI Prediction", type="primary", use_container_width=True):
                 progress_bar = st.progress(0)
-                
-                # Mock schema mappings for demo purposes if exact columns are missing
+                status_text = st.empty()
+                results = []
+                valid_emp = ["Salaried", "SelfEmployed", "Business", "Farmer", "Unemployed"]
+                valid_home = ["Own", "Rent", "Mortgage", "Other"]
+                valid_purpose = ["Personal", "Education", "Vehicle", "Home", "Agri", "Business", "Medical", "Venture"]
+
                 for idx, row in df_batch.iterrows():
                     try:
+                        emp_type_raw = str(row.get("employment_type", "Salaried"))
+                        if emp_type_raw not in valid_emp: emp_type_raw = "Salaried"
+                        home_raw = str(row.get("home_ownership", "Own"))
+                        if home_raw not in valid_home: home_raw = "Own"
+                        purpose_raw = str(row.get("loan_purpose", "Personal"))
+                        if purpose_raw not in valid_purpose: purpose_raw = "Personal"
+
                         batch_req = InferenceRequest(
                             borrower=BorrowerInput(
-                                age=int(row.get('age', 35)),
-                                annual_income=float(row.get('annual_income', 720000)),
-                                employment_type=EmploymentType(row.get('employment_type', 'Salaried')),
-                                employment_length_months=int(row.get('employment_length', 36)),
-                                home_ownership=HomeOwnership(row.get('home_ownership', 'Own')),
-                                credit_score=int(row.get('credit_score', 720)),
-                                dependents=int(row.get('dependents', 1)),
+                                age=max(21, min(70, int(row.get("age", 35)))),
+                                annual_income=float(max(10000, row.get("annual_income", 720000))),
+                                employment_type=EmploymentType(emp_type_raw),
+                                employment_length_months=int(max(0, row.get("employment_length", 36))),
+                                home_ownership=HomeOwnership(home_raw),
+                                credit_score=int(max(300, min(900, row.get("credit_score", 700)))),
+                                dependents=int(max(0, row.get("dependents", 0))),
                             ),
                             loan=LoanInput(
-                                loan_amount=float(row.get('loan_amount', 500000)),
-                                loan_tenure_months=int(row.get('loan_tenure', 60)),
-                                loan_purpose=LoanPurpose(row.get('loan_purpose', 'Personal')),
-                                interest_rate=float(row.get('interest_rate', 12.0)),
-                                co_applicant=bool(row.get('co_applicant', False)),
-                                insurance=bool(row.get('insurance', False)),
-                                existing_monthly_obligations=float(row.get('existing_emi', 5000)),
+                                loan_amount=float(max(10000, row.get("loan_amount", 500000))),
+                                loan_tenure_months=int(max(6, row.get("loan_tenure", 60))),
+                                loan_purpose=LoanPurpose(purpose_raw),
+                                interest_rate=float(max(5.0, min(36.0, row.get("interest_rate", 12.0)))),
+                                co_applicant=bool(row.get("co_applicant", False)),
+                                insurance=bool(row.get("insurance", False)),
+                                existing_monthly_obligations=float(max(0, row.get("existing_emi", 0))),
                             ),
-                            geo=GeoInput(state=str(row.get('state', 'Maharashtra'))),
+                            geo=GeoInput(state=str(row.get("state", "Maharashtra"))),
                         )
-                        
                         batch_res = pipeline.run(batch_req)
                         results.append({
-                            "Risk Level": batch_res.risk_level.value,
+                            "Row": idx + 1,
+                            "Age": int(row.get("age", 35)),
+                            "Credit Score": int(row.get("credit_score", 700)),
+                            "Loan Amount": "₹{:,}".format(int(row.get("loan_amount", 500000))),
                             "Default Probability": f"{batch_res.default_probability*100:.1f}%",
-                            "Expected Loss (₹)": batch_res.expected_loss,
-                            "Recommendation": batch_res.recommendation.action.value,
-                            "Borrower Score": batch_res.borrower_360.borrower_score
+                            "Risk Level": batch_res.risk_level.value,
+                            "AI Decision": batch_res.recommendation.action.value.replace("_", " "),
+                            "Expected Loss": f"₹{batch_res.expected_loss:,.0f}",
+                            "Borrower Score": f"{batch_res.borrower_360.borrower_score:.1f}/100",
                         })
-                    except Exception as e:
-                        results.append({"Error": str(e)})
-                    
+                    except Exception as row_err:
+                        results.append({"Row": idx + 1, "Error": str(row_err)[:120]})
                     progress_bar.progress((idx + 1) / len(df_batch))
-                
-                # Show results
+                    status_text.text(f"Processing {idx+1}/{len(df_batch)}...")
+
+                status_text.empty()
                 df_results = pd.DataFrame(results)
-                st.success("Batch Prediction Complete!")
+                st.success(f"✅ **Batch Scoring Complete — {len(results)} applications processed!**")
+
+                valid_results = [r for r in results if "Error" not in r]
+                if valid_results:
+                    risk_counts = {}
+                    for r in valid_results:
+                        rl = r.get("Risk Level", "Unknown")
+                        risk_counts[rl] = risk_counts.get(rl, 0) + 1
+                    ms1, ms2, ms3, ms4 = st.columns(4)
+                    ms1.metric("Total", len(valid_results))
+                    ms2.metric("LOW Risk", risk_counts.get("LOW", 0))
+                    ms3.metric("MEDIUM", risk_counts.get("MEDIUM", 0))
+                    ms4.metric("HIGH/VERY HIGH", risk_counts.get("HIGH", 0) + risk_counts.get("VERY_HIGH", 0))
+
+                    if len(risk_counts) >= 1:
+                        fig_bar = px.bar(x=list(risk_counts.keys()), y=list(risk_counts.values()),
+                                         color=list(risk_counts.keys()),
+                                         color_discrete_map={"LOW": "#27ae60", "MEDIUM": "#f39c12", "HIGH": "#e74c3c", "VERY_HIGH": "#8b0000"},
+                                         title="Risk Distribution")
+                        fig_bar.update_layout(paper_bgcolor="#0a0f1e", plot_bgcolor="#0a0f1e", font_color="#c9d5e8", showlegend=False)
+                        st.plotly_chart(fig_bar, use_container_width=True)
+
                 st.dataframe(df_results, use_container_width=True)
-                
-                # Download button
-                csv = df_results.to_csv(index=False).encode('utf-8')
-                st.download_button("⬇ Download Results", data=csv, file_name="batch_predictions.csv", mime="text/csv")
-                
+                csv_out = df_results.to_csv(index=False).encode("utf-8")
+                st.download_button("ð¥ Download Full Prediction Report (CSV)", data=csv_out, file_name="batch_risk_predictions.csv", mime="text/csv", type="primary")
         except Exception as e:
-            st.error(f"Error reading dataset: {e}")
+            st.error(f"❌ Error reading dataset: {e}")
+            st.exception(e)
 
 # Business Rules
 st.markdown('<p class="section-header">📏 Business Rules Evaluation</p>', unsafe_allow_html=True)

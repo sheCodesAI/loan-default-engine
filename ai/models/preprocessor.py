@@ -1,18 +1,15 @@
 """
 Preprocessing pipeline builder for the IDBI AI module.
 
-Builds a sklearn ColumnTransformer that handles:
-  - Numeric features     → StandardScaler
-  - Nominal categoricals → OneHotEncoder
-  - Binary (0/1) int     → PassThrough (no scaling needed)
+CRITICAL DESIGN PRINCIPLE:
+  Only include features that CAN be faithfully reproduced at inference time
+  from the UI inputs. Any feature listed here that gets hardcoded to a single
+  constant at inference time KILLS the model's discriminative power.
 
-Updated for the IDBI dataset which has:
-  - Actual credit_score (no loan_grade proxy needed)
-  - Pre-computed dti_ratio, emi_amount, area_default_rate
-  - Geographic risk scores from the dataset
-
-Design: Separate preprocessor (not embedded inside model Pipeline) so it
-can be inspected, saved, and loaded independently from the model.
+Feature groups:
+  NUMERIC_FEATURES  → StandardScaler
+  NOMINAL_FEATURES  → OneHotEncoder
+  BINARY_FEATURES   → PassThrough
 """
 
 from __future__ import annotations
@@ -28,32 +25,31 @@ from ai.logger import get_logger
 
 logger = get_logger(__name__)
 
-# ─── Feature Column Groups ────────────────────────────────────────────────────
+# ── Features that are AVAILABLE at inference time ─────────────────────────────
+# These come directly from the UI form / CSV upload.
 
 NUMERIC_FEATURES: List[str] = [
     # Demographics
     "age",
-    # Financial
+    # Financial — directly captured in UI
     "income",
     "monthly_income",
     "employment_length",
     "credit_score",
     "credit_history_length",
     "delinquency_count",
-    # Loan
+    # Loan — directly captured in UI
     "loan_amount",
     "loan_tenure",
     "interest_rate",
     "emi_amount",
     "existing_emi",
     "dti_ratio",
-    # Geographic / area-level
+    # Geographic risk scores — computed from state lookup
     "area_default_rate",
     "district_risk_score",
     "state_risk_score",
-    "distance_to_branch_km",
-    "service_area_cluster",
-    # Engineered
+    # Engineered (computed from UI inputs)
     "repayment_capacity",
     "cash_flow_health",
     "loan_to_income_ratio",
@@ -62,29 +58,24 @@ NUMERIC_FEATURES: List[str] = [
 ]
 
 NOMINAL_FEATURES: List[str] = [
+    # Directly captured in UI
     "employment_type",
-    "gender",
-    "education",
-    "marital_status",
     "loan_purpose",
+    "state",          # Geographic state — high signal for geo-risk
+    # From dataset — can be derived from loan product type
     "loan_product",
     "loan_source_type",
-    "urban_rural_flag",
     "branch_region",
-    "population_density_band",
-    "economic_activity_type",
-    "channel",
-    "state",               # High-value geographic signal: captures state-level economic patterns
 ]
 
 BINARY_FEATURES: List[str] = [
-    "has_mortgage",         # already encoded 0/1 by cleaner
-    "has_dependents",       # already encoded 0/1
-    "has_cosigner",         # already encoded 0/1
-    "past_default_flag",
-    "near_retirement_flag",
-    "high_dti_flag",
-    "delinquency_flag",
+    "has_mortgage",         # derived from home_ownership
+    "has_dependents",       # from dependents > 0
+    "has_cosigner",         # from co_applicant checkbox
+    "past_default_flag",    # from dataset
+    "near_retirement_flag", # age > 58
+    "high_dti_flag",        # dti_ratio > 0.60
+    "delinquency_flag",     # delinquency_count > 0
 ]
 
 
@@ -97,8 +88,7 @@ def build_preprocessor(
     Build an unfitted sklearn ColumnTransformer.
 
     If a DataFrame is provided, column lists are automatically filtered
-    to only include columns present in the DataFrame — making it robust
-    to optional/missing columns.
+    to only include columns present in the DataFrame.
 
     Args:
         df: Optional DataFrame used to filter column lists.
@@ -106,7 +96,7 @@ def build_preprocessor(
         nominal_features: Override nominal feature list.
 
     Returns:
-        Unfitted :class:`sklearn.compose.ColumnTransformer`.
+        Unfitted ColumnTransformer.
     """
     num_cols = numeric_features or NUMERIC_FEATURES
     nom_cols = nominal_features or NOMINAL_FEATURES
